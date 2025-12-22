@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'Statistique.dart';
+import 'Alerte.dart';
+import 'Profil.dart';
 import 'dart:ui';
 
 class Accueil extends StatefulWidget {
@@ -341,7 +343,7 @@ class _AccueilState extends State<Accueil> {
     return Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _noraAccentBlue));
   }
 
-Widget _buildBottomNav() {
+  Widget _buildBottomNav() {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       height: 70,
@@ -363,7 +365,7 @@ Widget _buildBottomNav() {
           type: BottomNavigationBarType.fixed,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: ""),
-            BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: ""), // Index 1
+            BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: ""),
             BottomNavigationBarItem(icon: SizedBox.shrink(), label: ""),
             BottomNavigationBarItem(icon: Icon(Icons.notifications_active_outlined), label: ""),
             BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: ""),
@@ -375,6 +377,16 @@ Widget _buildBottomNav() {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const Statistique()),
+              );
+            } else if (i == 3) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const Alerte()),
+              );
+            } else if (i == 4) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const Profil()),
               );
             }
           },

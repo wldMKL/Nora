@@ -3,6 +3,8 @@ import 'package:nora/pages/Accueil.dart';
 import 'package:nora/pages/Connexion.dart';
 import 'package:nora/pages/Inscription.dart';
 import 'package:nora/pages/Statistique.dart';
+import 'package:nora/pages/Alerte.dart';
+import 'package:nora/pages/Profil.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +30,8 @@ class MyApp extends StatelessWidget {
         '/connexion': (context) => const Connexion(),
         '/inscription': (context) => const Inscription(),
         '/statistique':(context) =>  const Statistique(),
+        '/alert':(context) => const Alerte(),
+        '/profil':(context) => const Profil(),
         },
     );
   }
