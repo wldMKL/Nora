@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'Statistique.dart';
 import 'dart:ui';
 
 class Accueil extends StatefulWidget {
@@ -285,7 +286,7 @@ class _AccueilState extends State<Accueil> {
                 children: [
                   Icon(room['icon'], color: _noraAccentBlue, size: 30),
                   const Spacer(),
-                  Text(room['name'], 
+                  Text(room['name'],
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _noraAccentBlue)),
@@ -340,7 +341,7 @@ class _AccueilState extends State<Accueil> {
     return Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _noraAccentBlue));
   }
 
-  Widget _buildBottomNav() {
+Widget _buildBottomNav() {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       height: 70,
@@ -362,12 +363,21 @@ class _AccueilState extends State<Accueil> {
           type: BottomNavigationBarType.fixed,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: ""),
-            BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: ""),
-            BottomNavigationBarItem(icon: SizedBox.shrink(), label: ""), 
+            BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: ""), // Index 1
+            BottomNavigationBarItem(icon: SizedBox.shrink(), label: ""),
             BottomNavigationBarItem(icon: Icon(Icons.notifications_active_outlined), label: ""),
             BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: ""),
           ],
-          onTap: (i) => setState(() => _selectedIndex = i),
+          onTap: (i) {
+            setState(() => _selectedIndex = i);
+            // LOGIQUE DE NAVIGATION
+            if (i == 1) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const Statistique()),
+              );
+            }
+          },
         ),
       ),
     );

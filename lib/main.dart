@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nora/pages/Accueil.dart';
 import 'package:nora/pages/Connexion.dart';
 import 'package:nora/pages/Inscription.dart';
+import 'package:nora/pages/Statistique.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +27,8 @@ class MyApp extends StatelessWidget {
         '/accueil': (context) => Accueil(),
         '/connexion': (context) => const Connexion(),
         '/inscription': (context) => const Inscription(),
-      },
+        '/statistique':(context) =>  const Statistique(),
+        },
     );
   }
 }
