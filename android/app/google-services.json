@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "889900014128",
+    "project_id": "nora-3e220",
+    "storage_bucket": "nora-3e220.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:889900014128:android:ce160963db20dd9e2cebf5",
+        "android_client_info": {
+          "package_name": "com.example.nora"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDNZvw9tjaFajaSGr9CIlTmIUPYrk3AiR8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

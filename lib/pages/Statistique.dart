@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
-import 'dart:ui';
 
 class Statistique extends StatefulWidget {
   const Statistique({super.key});

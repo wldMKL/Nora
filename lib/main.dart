@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart'; // Import indispensable
+import 'firebase_options.dart'; // Import de vos clés API
 import 'package:nora/pages/Accueil.dart';
 import 'package:nora/pages/Connexion.dart';
 import 'package:nora/pages/Inscription.dart';
@@ -7,12 +9,24 @@ import 'package:nora/pages/Alerte.dart';
 import 'package:nora/pages/Profil.dart';
 
 void main() async {
+  // 1. Initialise les liens avec le système
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    // 2. Tente d'allumer Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print("Firebase est bien initialisé !");
+  } catch (e) {
+    print("Erreur d'initialisation : $e");
+  }
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -24,15 +38,15 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF5F7FA),
         fontFamily: 'Roboto',
       ),
-      home:  Accueil(),
+      home: const Connexion(), // Démarrage sur la page de connexion
       routes: {
-        '/accueil': (context) => Accueil(),
+        '/accueil': (context) => const Accueil(),
         '/connexion': (context) => const Connexion(),
         '/inscription': (context) => const Inscription(),
-        '/statistique':(context) =>  const Statistique(),
-        '/alert':(context) => const Alerte(),
-        '/profil':(context) => const Profil(),
-        },
+        '/statistique': (context) => const Statistique(),
+        '/alert': (context) => const Alerte(),
+        '/profil': (context) => const Profil(),
+      },
     );
   }
 }
