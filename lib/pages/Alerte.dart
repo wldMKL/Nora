@@ -1,227 +1,319 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart'; // Pour les animations
+import 'package:intl/intl.dart';
+import '../services/monitoring_service.dart';
 
-class Alerte extends StatelessWidget {
+// Navigation
+import 'Accueil.dart';
+import 'Statistique.dart';
+import 'Profil.dart';
+
+class Alerte extends StatefulWidget {
   const Alerte({super.key});
 
-  // Couleurs thématiques
-  static const Color _noraAccentBlue = Color(0xFF201293);
-  static const Color _warningRed = Color(0xFFE53935);
-  static const Color _bgColor = Color(0xFFF8F9FA);
+  @override
+  State<Alerte> createState() => _AlerteState();
+}
 
-  // Liste fictive d'alertes
-  static const List<Map<String, dynamic>> _alerts = [
-    {
-      'title': 'Pic de poussière détecté',
-      'room': 'Salle Cisco',
-      'time': 'Il y a 2 min',
-      'level': 'Critique',
-      'desc': 'Le taux de particules PM2.5 a dépassé 50 µg/m³. Port du masque conseillé.',
-      'icon': Icons.warning_amber_rounded,
-      'color': Color(0xFFE53935),
-    },
-    {
-      'title': 'Maintenance requise',
-      'room': 'Amphi Théâtre',
-      'time': 'Il y a 1h',
-      'level': 'Info',
-      'desc': 'Le capteur de la salle nécessite un nettoyage pour rester précis.',
-      'icon': Icons.settings_suggest_rounded,
-      'color': Color(0xFF201293),
-    },
-    {
-      'title': 'Qualité de l\'air moyenne',
-      'room': 'Labo Réseaux',
-      'time': 'Il y a 3h',
-      'level': 'Avertissement',
-      'desc': 'Légère hausse de l\'humidité. Risque de prolifération de moisissures.',
-      'icon': Icons.info_outline_rounded,
-      'color': Color(0xFFFF9800),
-    },
-  ];
+class _AlerteState extends State<Alerte> {
+  static const Color _noraBlue = Color(0xFF201293);
+  static const Color _noraSky = Color(0xFF5B9EEA);
+  static const Color _noraSoftBlue = Color(0xFFE3F2FD);
+
+  int _selectedIndex = 3;
+  int _selectedFilterIndex = 0;
+  final List<String> _filters = ["Aujourd'hui", "7 derniers jours"];
+
+  @override
+  void initState() {
+    super.initState();
+    MonitoringService.cleanOldAlerts();
+    
+    // EXEMPLES : Simulation de données si la liste est vide pour ton test
+    if (MonitoringService.activeAlerts.isEmpty) {
+      MonitoringService.activeAlerts.addAll([
+        HealthAlert(
+          title: "Risque de Grippe Élevé",
+          desc: "L'humidité est tombée à 32%. Le virus survit plus longtemps dans l'air sec.",
+          room: "Salle Cisco",
+          level: "Critique",
+          color: Colors.redAccent,
+          icon: Icons.coronavirus_rounded,
+          time: DateTime.now().subtract(const Duration(minutes: 15)),
+        ),
+        HealthAlert(
+          title: "Prolifération Bactérienne",
+          desc: "Température de 31.5°C détectée. Idéal pour le développement des germes.",
+          room: "Labo Réseaux",
+          level: "Avertissement",
+          color: Colors.orangeAccent,
+          icon: Icons.bug_report_rounded,
+          time: DateTime.now().subtract(const Duration(hours: 2)),
+        ),
+      ]);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final DateTime now = DateTime.now();
+    final List<HealthAlert> displayedAlerts = MonitoringService.activeAlerts.where((alert) {
+      if (_selectedFilterIndex == 0) {
+        return alert.time.day == now.day && alert.time.month == now.month;
+      }
+      return true;
+    }).toList();
+
     return Scaffold(
-      backgroundColor: _bgColor,
+      extendBody: true,
+      backgroundColor: Colors.white,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [_warningRed.withOpacity(0.05), Colors.white],
+            colors: [_noraSoftBlue, Colors.white],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
         ),
         child: SafeArea(
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              _buildAppBar(context),
-              SliverPadding(
-                padding: const EdgeInsets.all(20),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => _buildAlertCard(_alerts[index]),
-                    childCount: _alerts.length,
+          child: AnimationLimiter( // Conteneur d'animation
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                _buildAppBar(),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+                    child: _buildFilterSelector(),
                   ),
                 ),
-              ),
-              _buildPreventionTip(),
-            ],
+                _buildStatusHeader(displayedAlerts.length),
+                displayedAlerts.isEmpty
+                    ? _buildEmptyState()
+                    : SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final alert = displayedAlerts[index];
+                              return AnimationConfiguration.staggeredList(
+                                position: index,
+                                duration: const Duration(milliseconds: 500),
+                                child: SlideAnimation( // Animation de glissement
+                                  verticalOffset: 50.0,
+                                  child: FadeInAnimation( // Animation d'apparition
+                                    child: _buildInteractiveDismissible(alert),
+                                  ),
+                                ),
+                              );
+                            },
+                            childCount: displayedAlerts.length,
+                          ),
+                        ),
+                      ),
+                const SliverToBoxAdapter(child: SizedBox(height: 120)),
+              ],
+            ),
           ),
         ),
       ),
+      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
-  Widget _buildAppBar(BuildContext context) {
-    return SliverAppBar(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      centerTitle: true,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _noraAccentBlue),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: const Text(
-        "Alertes Santé",
-        style: TextStyle(color: _noraAccentBlue, fontWeight: FontWeight.bold),
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.done_all_rounded, color: _noraAccentBlue),
-          onPressed: () {},
-        )
-      ],
+  Widget _buildInteractiveDismissible(HealthAlert alert) {
+    return Dismissible(
+      key: Key(alert.time.toString() + alert.title),
+      direction: DismissDirection.endToStart,
+      background: _buildDeleteBackground(),
+      onDismissed: (direction) {
+        setState(() => MonitoringService.activeAlerts.remove(alert));
+      },
+      child: _buildAlertCard(alert),
     );
   }
 
-  Widget _buildAlertCard(Map<String, dynamic> alert) {
-    final Color alertColor = alert['color'] as Color;
-    
+  Widget _buildAlertCard(HealthAlert alert) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: alertColor.withOpacity(0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: alertColor.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: alert.color.withOpacity(0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           )
         ],
+        border: Border.all(color: alert.color.withOpacity(0.2)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(alert['icon'] as IconData, color: alertColor, size: 28),
-                  const SizedBox(width: 12),
-                  Text(
-                    (alert['level'] as String).toUpperCase(),
-                    style: TextStyle(
-                      color: alertColor,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                alert['time'] as String,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 15),
-          Text(
-            alert['title'] as String,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: _noraAccentBlue,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            "Localisation : ${alert['room']}",
-            style: TextStyle(
-              color: _noraAccentBlue.withOpacity(0.6),
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            alert['desc'] as String,
-            style: const TextStyle(color: Colors.black87, fontSize: 14, height: 1.4),
-          ),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: alertColor,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text("Voir les détails"),
+      child: Material( // Pour l'effet de pression (InkWell)
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(25),
+          onTap: () => _showDetailsDialog(alert),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Hero( // Animation Hero pour l'icône
+                  tag: alert.time.toString(),
+                  child: Icon(alert.icon, color: alert.color, size: 30),
                 ),
-              ),
-              const SizedBox(width: 10),
-              IconButton.filledTonal(
-                onPressed: () {},
-                icon: const Icon(Icons.share_rounded),
-              ),
-            ],
-          )
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(alert.title, 
+                        style: const TextStyle(color: _noraBlue, fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 4),
+                      Text(alert.room, 
+                        style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDetailsDialog(HealthAlert alert) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        title: Row(
+          children: [
+            Icon(alert.icon, color: alert.color),
+            const SizedBox(width: 10),
+            const Text("Détails du risque"),
+          ],
+        ),
+        content: Text(alert.desc),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Compris", style: TextStyle(color: _noraBlue)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPreventionTip() {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: _noraAccentBlue,
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.lightbulb_outline, color: Colors.white, size: 40),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      "Conseil du jour",
-                      style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      "Aérez les salles pendant 10 min entre chaque séance pour évacuer les micro-particules.",
-                      style: TextStyle(color: Colors.white, fontSize: 13),
-                    ),
-                  ],
+  // ... (Garde tes widgets _buildDeleteBackground, _buildFilterSelector, _buildAppBar, etc.)
+  
+  Widget _buildDeleteBackground() {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 25),
+      margin: const EdgeInsets.only(bottom: 15),
+      decoration: BoxDecoration(
+        color: Colors.redAccent,
+        borderRadius: BorderRadius.circular(25),
+      ),
+      child: const Icon(Icons.delete_forever_rounded, color: Colors.white),
+    );
+  }
+
+  Widget _buildFilterSelector() {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: _noraBlue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)),
+      child: Row(
+        children: List.generate(_filters.length, (index) {
+          bool isSelected = _selectedFilterIndex == index;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedFilterIndex = index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)] : [],
+                ),
+                child: Center(
+                  child: Text(_filters[index],
+                    style: TextStyle(color: isSelected ? _noraBlue : _noraBlue.withOpacity(0.4), fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildStatusHeader(int count) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text("$count Notifications", style: const TextStyle(color: _noraBlue, fontWeight: FontWeight.w800, fontSize: 18)),
+            if (count > 0)
+              TextButton(
+                onPressed: () => setState(() => MonitoringService.activeAlerts.clear()),
+                child: const Text("Tout effacer", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return const SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.only(top: 100),
+        child: Center(child: Text("Aucun historique.", style: TextStyle(color: Colors.grey))),
+      ),
+    );
+  }
+
+  Widget _buildAppBar() {
+    return const SliverAppBar(
+      backgroundColor: Colors.transparent, elevation: 0, centerTitle: true,
+      title: Text("Notifications", style: TextStyle(color: _noraBlue, fontWeight: FontWeight.w900, fontSize: 22)),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(25, 0, 25, 30),
+      height: 75,
+      decoration: BoxDecoration(color: _noraBlue, borderRadius: BorderRadius.circular(35)),
+      child: BottomNavigationBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white38,
+        type: BottomNavigationBarType.fixed,
+        showSelectedLabels: false,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.add_box_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.notifications_active_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: ""),
+        ],
+        onTap: (index) {
+          if (index != _selectedIndex) {
+            if (index == 0) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const Accueil()));
+            if (index == 1) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const Statistique()));
+            if (index == 4) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const Profil()));
+          }
+        },
       ),
     );
   }
