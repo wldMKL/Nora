@@ -1,10 +1,7 @@
 plugins {
     id("com.android.application")
-    // START: FlutterFire Configuration
     id("com.google.gms.google-services")
-    // END: FlutterFire Configuration
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -14,29 +11,32 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // ON PASSE EN VERSION 17 POUR ÉVITER LES WARNINGS
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        
+        // INDISPENSABLE POUR LES NOTIFICATIONS
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
+        // ON ALIGNE KOTLIN SUR LA VERSION 17
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.nora"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // MIN SDK 21 EST REQUIS PAR LES NOTIFICATIONS
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        multiDexEnabled = true
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -44,4 +44,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // BIBLIOTHÈQUE POUR LE DESUGARING
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

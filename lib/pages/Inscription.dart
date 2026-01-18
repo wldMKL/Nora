@@ -13,28 +13,35 @@ class Inscription extends StatefulWidget {
 
 class _InscriptionState extends State<Inscription> {
   final _formKey = GlobalKey<FormState>();
+  
+  // Contrôleurs
   final TextEditingController _nomController = TextEditingController();
   final TextEditingController _prenomController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
   
+  // Variables d'état
   bool _obscurePassword = true;
   bool _isLoading = false; 
   bool _acceptTerms = false;
   double _buttonScale = 1.0;
 
+  // Couleurs
   static const Color _noraBlue = Color(0xFF201293);
   static const Color _noraSky = Color(0xFF5B9EEA);
   static const Color _noraWhite = Colors.white;
 
+  // --- FONCTION D'INSCRIPTION ---
   Future<void> _inscription() async {
     if (!_acceptTerms) {
-      _showSnackBar("Veuillez accepter les conditions", Colors.orange);
+      _showSnackBar("Veuillez accepter les conditions d'utilisation", Colors.orange);
       return;
     }
+
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
+
       try {
         UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
@@ -49,9 +56,29 @@ class _InscriptionState extends State<Inscription> {
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        if (mounted) Navigator.pushReplacementNamed(context, '/connexion');
+        if (mounted) {
+          _showSnackBar("Félicitations ! Votre compte a été créé avec succès.", Colors.green);
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/connexion');
+          }
+        }
+
+      } on FirebaseAuthException catch (e) {
+        String errorMessage = "Une erreur est survenue lors de l'inscription.";
+        if (e.code == 'email-already-in-use') {
+          errorMessage = "Cette adresse email est déjà associée à un autre compte.";
+        } else if (e.code == 'weak-password') {
+          errorMessage = "Le mot de passe est trop faible (6 caractères minimum).";
+        } else if (e.code == 'invalid-email') {
+          errorMessage = "Le format de l'adresse email est invalide.";
+        } else if (e.code == 'network-request-failed') {
+          errorMessage = "Problème de connexion internet.";
+        }
+        _showSnackBar(errorMessage, Colors.redAccent);
+
       } catch (e) {
-        _showSnackBar("Erreur lors de l'inscription", Colors.redAccent);
+        _showSnackBar("Erreur technique : ${e.toString()}", Colors.redAccent);
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -60,8 +87,12 @@ class _InscriptionState extends State<Inscription> {
 
   void _showSnackBar(String msg, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold)), 
-      backgroundColor: color, behavior: SnackBarBehavior.floating),
+      SnackBar(
+        content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold)), 
+        backgroundColor: color, 
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 
@@ -100,7 +131,9 @@ class _InscriptionState extends State<Inscription> {
                           child: FadeInAnimation(child: widget),
                         ),
                         children: [
+                          // APPEL DU LOGO MODIFIÉ (HORIZONTAL)
                           _buildLogo(),
+                          
                           const SizedBox(height: 25),
                           const Text("Créer un compte", style: TextStyle(color: _noraBlue, fontSize: 28, fontWeight: FontWeight.w900)),
                           const SizedBox(height: 8),
@@ -131,15 +164,27 @@ class _InscriptionState extends State<Inscription> {
     return Container(width: size, height: size, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
   }
 
+  // --- MODIFICATION ICI : UTILISATION DE ROW AU LIEU DE COLUMN ---
   Widget _buildLogo() {
-    return Container(
-      height: 80, width: 80,
-      decoration: BoxDecoration(
-        color: _noraBlue,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [BoxShadow(color: _noraBlue.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 8))],
-      ),
-      child: const Center(child: Text("N", style: TextStyle(color: _noraWhite, fontSize: 38, fontWeight: FontWeight.w900))),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center, // Centre les éléments horizontalement
+      crossAxisAlignment: CrossAxisAlignment.center, // Centre verticalement
+      children: [
+        // Fichier 2.png : Le logo tourbillon bleu
+        Image.asset(
+          'lib/images/Fichier 2.png',
+          height: 70, // Taille ajustée pour l'équilibre
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(width: 15), // Espace horizontal entre l'icône et le texte
+        // Fichier 3.png : Le texte NORA
+        Image.asset(
+          'lib/images/Fichier 3.png',
+          height: 35, // Taille ajustée pour correspondre à la hauteur visuelle du logo
+          fit: BoxFit.contain,
+          color: _noraBlue, 
+        ),
+      ],
     );
   }
 
@@ -175,6 +220,12 @@ class _InscriptionState extends State<Inscription> {
         controller: controller,
         obscureText: isPass ? _obscurePassword : false,
         style: const TextStyle(color: _noraBlue, fontWeight: FontWeight.w600),
+        validator: (value) {
+            if (value == null || value.isEmpty) return "Ce champ est requis";
+            if (isPass && value.length < 6) return "6 caractères minimum";
+            if (hint == "Confirmer le mot de passe" && value != _passwordController.text) return "Les mots de passe ne correspondent pas";
+            return null;
+        },
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(color: _noraBlue.withOpacity(0.3), fontSize: 13),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/monitoring_service.dart';
 
 // Navigation
 import 'Accueil.dart';
@@ -15,324 +16,428 @@ class Profil extends StatefulWidget {
   State<Profil> createState() => _ProfilState();
 }
 
-class _ProfilState extends State<Profil> {
+class _ProfilState extends State<Profil> with SingleTickerProviderStateMixin {
   // --- DESIGN SYSTEM ---
   static const Color _noraPrimary = Color(0xFF201293);
   static const Color _noraSky = Color(0xFF5B9EEA);
   static const Color _noraPurple = Color(0xFF9D84F5);
   static const Color _noraSuccess = Color(0xFF4CAF50);
+  static const Color _noraWhite = Colors.white;
 
-  int _selectedIndex = 4;
+  int _selectedIndex = 4; // Index 4 pour le Profil
   bool _notificationsEnabled = true;
   bool _darkModeEnabled = false;
 
   final User? currentUser = FirebaseAuth.instance.currentUser;
+  
+  // Animation Avatar
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  final Map<String, IconData> _availableAvatars = {
+    'default': Icons.person_rounded,
+    'cool': Icons.sentiment_very_satisfied_rounded,
+    'tech': Icons.memory_rounded,
+    'eco': Icons.eco_rounded,
+    'gamer': Icons.sports_esports_rounded,
+    'sport': Icons.directions_run_rounded,
+    'music': Icons.headphones_rounded,
+    'travel': Icons.flight_takeoff_rounded,
+    'idea': Icons.lightbulb_rounded,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Dynamisation des couleurs selon le mode
     final Color textColor = _darkModeEnabled ? Colors.white : _noraPrimary;
-    final Color cardBg = _darkModeEnabled ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.8);
-    final Color dividerColor = _darkModeEnabled ? Colors.white10 : Colors.black12;
+    final Color cardBg = _darkModeEnabled ? const Color(0xFF252540) : Colors.white;
+    final Color scaffoldBg = _darkModeEnabled ? const Color(0xFF0F0F1E) : const Color(0xFFF5F7FA);
 
     return Scaffold(
       extendBody: true,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: _darkModeEnabled 
-                ? [const Color(0xFF0F0F1E), const Color(0xFF1A1A2E)]
-                : [_noraPurple.withOpacity(0.1), _noraSky.withOpacity(0.05), Colors.white],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              _buildAppBar(textColor),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 140),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    _buildDynamicProfileHeader(),
-                    const SizedBox(height: 30),
-                    _buildQuickStats(cardBg, textColor),
-                    const SizedBox(height: 35),
-                    _buildSectionTitle("Préférences App", textColor),
-                    const SizedBox(height: 15),
-                    _buildSettingsGroup(cardBg, textColor, dividerColor),
-                    const SizedBox(height: 30),
-                    _buildSectionTitle("Sécurité & Compte", textColor),
-                    const SizedBox(height: 15),
-                    _buildAccountGroup(cardBg, textColor, dividerColor),
-                    const SizedBox(height: 40),
-                    _buildLogoutAction(),
-                  ]),
+      backgroundColor: scaffoldBg,
+      body: Stack(
+        children: [
+          // Fond flou
+          Positioned(
+            top: -100, right: -50,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+              child: Container(
+                width: 300, height: 300,
+                decoration: BoxDecoration(
+                  color: _noraSky.withOpacity(0.15),
+                  shape: BoxShape.circle,
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+          
+          SafeArea(
+            bottom: false,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                _buildAppBar(textColor),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 140),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      _buildDynamicProfileHeader(),
+                      const SizedBox(height: 25),
+                      _buildQuickStats(cardBg, textColor),
+                      const SizedBox(height: 30),
+                      _buildSectionTitle("Préférences", textColor),
+                      const SizedBox(height: 15),
+                      _buildSettingsCard(cardBg, textColor),
+                      const SizedBox(height: 30),
+                      _buildSectionTitle("Compte", textColor),
+                      const SizedBox(height: 15),
+                      _buildAccountCard(cardBg, textColor),
+                      const SizedBox(height: 40),
+                      _buildLogoutButton(),
+                    ]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
 
-  // --- WIDGETS DE DATA ---
+  // --- WIDGETS ---
+  
   Widget _buildDynamicProfileHeader() {
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance.collection('users').doc(currentUser?.uid).get(),
       builder: (context, snapshot) {
         String nom = "...";
         String prenom = "...";
-        String email = currentUser?.email ?? "Email non disponible";
+        String email = currentUser?.email ?? "";
+        String avatarKey = 'default';
 
         if (snapshot.hasData && snapshot.data!.exists) {
           var data = snapshot.data!.data() as Map<String, dynamic>;
           nom = data['nom'] ?? "";
           prenom = data['prenom'] ?? "";
+          avatarKey = data['avatarKey'] ?? 'default';
         }
-
-        return _buildHeaderUI(nom, prenom, email);
+        return _buildHeaderUI(nom, prenom, email, avatarKey);
       },
     );
   }
 
-  // --- UI COMPONENTS ---
-  Widget _buildAppBar(Color textColor) {
-    return SliverAppBar(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      centerTitle: true,
-      automaticallyImplyLeading: false,
-      title: Text("Mon Espace", style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 22)),
-    );
-  }
+  Widget _buildHeaderUI(String nom, String prenom, String email, String avatarKey) {
+    IconData iconToShow = _availableAvatars[avatarKey] ?? Icons.person_rounded;
 
-  Widget _buildHeaderUI(String nom, String prenom, String email) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(40),
-        gradient: const LinearGradient(
-          colors: [_noraPrimary, _noraSky],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(color: _noraPrimary.withOpacity(0.3), blurRadius: 25, offset: const Offset(0, 12))
-        ],
-      ),
-      child: Column(
-        children: [
-          Stack(
-            alignment: Alignment.bottomRight,
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => _showAvatarSelectionModal(context),
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Container(
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
-                child: const CircleAvatar(radius: 45, backgroundColor: Colors.white24, child: Icon(Icons.person_rounded, size: 55, color: Colors.white)),
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: Container(
+                  width: 110, height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _noraPrimary.withOpacity(0.1), width: 1),
+                    color: _noraPrimary.withOpacity(0.05),
+                  ),
+                ),
               ),
               Container(
-                padding: const EdgeInsets.all(5),
-                decoration: const BoxDecoration(color: _noraSuccess, shape: BoxShape.circle),
-                child: const Icon(Icons.check, color: Colors.white, size: 14),
-              )
+                width: 100, height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(colors: [_noraPrimary, _noraSky], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  boxShadow: [BoxShadow(color: _noraPrimary.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
+                ),
+                child: Icon(iconToShow, size: 50, color: Colors.white),
+              ),
+              Positioned(
+                bottom: 0, right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _noraWhite,
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 5)],
+                  ),
+                  child: const Icon(Icons.edit, color: _noraPrimary, size: 16),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 20),
-          Text("$prenom $nom", style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-          const SizedBox(height: 5),
-          Text(email, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14, fontWeight: FontWeight.w400)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickStats(Color cardBg, Color textColor) {
-    return Row(
-      children: [
-        _buildStatCard("7", "Activité", Icons.bolt_rounded, Colors.amber, cardBg, textColor),
-        const SizedBox(width: 15),
-        _buildStatCard("12", "Alertes", Icons.notifications_none_rounded, Colors.orange, cardBg, textColor),
-        const SizedBox(width: 15),
-        _buildStatCard("Pro", "Niveau", Icons.workspace_premium_rounded, _noraSuccess, cardBg, textColor),
+        ),
+        const SizedBox(height: 15),
+        Text("$prenom $nom", style: TextStyle(color: _darkModeEnabled ? Colors.white : _noraPrimary, fontSize: 24, fontWeight: FontWeight.bold)),
+        Text(email, style: TextStyle(color: (_darkModeEnabled ? Colors.white : Colors.black).withOpacity(0.5), fontSize: 14)),
+        const SizedBox(height: 15),
+        Container(
+          width: 150, height: 6,
+          decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(10)),
+          child: Row(
+            children: [
+              Container(
+                width: 100, 
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  gradient: const LinearGradient(colors: [_noraSky, _noraPrimary]),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text("Niveau Expert", style: TextStyle(color: _noraSky, fontSize: 10, fontWeight: FontWeight.bold)),
       ],
     );
   }
 
-  Widget _buildStatCard(String val, String label, IconData icon, Color color, Color cardBg, Color textColor) {
+  Widget _buildQuickStats(Color cardBg, Color textColor) {
+    String alertCount = MonitoringService.activeAlerts.length.toString();
+    return Row(
+      children: [
+        _buildInteractiveStatCard("7", "Appareils", Icons.hub_rounded, Colors.purpleAccent, cardBg, textColor),
+        const SizedBox(width: 15),
+        _buildInteractiveStatCard(alertCount, "Alertes", Icons.notifications_active_rounded, Colors.orange, cardBg, textColor),
+        const SizedBox(width: 15),
+        _buildInteractiveStatCard("98%", "Santé Air", Icons.favorite_rounded, _noraSuccess, cardBg, textColor),
+      ],
+    );
+  }
+
+  Widget _buildInteractiveStatCard(String val, String label, IconData icon, Color iconColor, Color bg, Color text) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.white.withOpacity(0.5))),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 5))],
+        ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(height: 8),
-            Text(val, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-            Text(label, style: TextStyle(fontSize: 11, color: textColor.withOpacity(0.5), fontWeight: FontWeight.w600)),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: iconColor.withOpacity(0.1), shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(height: 12),
+            Text(val, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: text)),
+            Text(label, style: TextStyle(fontSize: 12, color: text.withOpacity(0.5))),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title, Color textColor) {
+  Widget _buildSettingsCard(Color bg, Color text) {
+    return Container(
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]),
+      child: Column(
+        children: [
+          _buildInteractiveToggle(Icons.notifications_outlined, "Notifications", _notificationsEnabled, (v) => setState(() => _notificationsEnabled = v), text),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Divider(height: 1, color: text.withOpacity(0.05))),
+          _buildInteractiveToggle(Icons.dark_mode_outlined, "Mode Sombre", _darkModeEnabled, (v) => setState(() => _darkModeEnabled = v), text),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountCard(Color bg, Color text) {
+    return Container(
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]),
+      child: Column(
+        children: [
+          _buildInteractiveTile(Icons.person_outline_rounded, "Profil & Données", text),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Divider(height: 1, color: text.withOpacity(0.05))),
+          _buildInteractiveTile(Icons.lock_outline_rounded, "Confidentialité", text),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Divider(height: 1, color: text.withOpacity(0.05))),
+          _buildInteractiveTile(Icons.help_outline_rounded, "Aide & Support", text),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInteractiveToggle(IconData icon, String title, bool value, Function(bool) onChanged, Color text) {
     return Padding(
-      padding: const EdgeInsets.only(left: 5),
-      child: Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: textColor, letterSpacing: 0.5)),
-    );
-  }
-
-  Widget _buildSettingsGroup(Color cardBg, Color textColor, Color dividerColor) {
-    return Container(
-      decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.white)),
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
         children: [
-          _buildSwitchTile(Icons.notifications_active_rounded, "Alertes Intelligentes", _notificationsEnabled, (v) => setState(() => _notificationsEnabled = v), textColor),
-          Divider(height: 1, indent: 60, color: dividerColor),
-          _buildSwitchTile(Icons.dark_mode_rounded, "Thème Sombre", _darkModeEnabled, (v) => setState(() => _darkModeEnabled = v), textColor),
+          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _noraPrimary.withOpacity(0.05), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _noraPrimary, size: 20)),
+          const SizedBox(width: 15),
+          Expanded(child: Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: text))),
+          Switch.adaptive(value: value, onChanged: onChanged, activeColor: _noraPrimary),
         ],
       ),
     );
   }
 
-  Widget _buildAccountGroup(Color cardBg, Color textColor, Color dividerColor) {
-    return Container(
-      decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.white)),
-      child: Column(
-        children: [
-          _buildMenuTile(Icons.manage_accounts_rounded, "Éditer mes informations", textColor),
-          Divider(height: 1, indent: 60, color: dividerColor),
-          _buildMenuTile(Icons.shield_moon_rounded, "Sécurité du compte", textColor),
-          Divider(height: 1, indent: 60, color: dividerColor),
-          _buildMenuTile(Icons.info_outline_rounded, "À propos de Nora Air", textColor),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSwitchTile(IconData icon, String title, bool val, ValueChanged<bool> onChanged, Color textColor) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-      leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: _noraSky.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, color: _noraSky, size: 22)),
-      title: Text(title, style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: 15)),
-      trailing: Switch.adaptive(value: val, onChanged: onChanged, activeColor: _noraSuccess),
-    );
-  }
-
-  Widget _buildMenuTile(IconData icon, String title, Color textColor) {
-    return ListTile(
+  Widget _buildInteractiveTile(IconData icon, String title, Color text) {
+    return InkWell(
       onTap: () {},
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-      leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: _noraSky.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, color: _noraSky, size: 22)),
-      title: Text(title, style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: 15)),
-      trailing: Icon(Icons.arrow_forward_ios_rounded, color: textColor.withOpacity(0.2), size: 16),
+      borderRadius: BorderRadius.circular(25),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        child: Row(
+          children: [
+            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _noraPrimary.withOpacity(0.05), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _noraPrimary, size: 20)),
+            const SizedBox(width: 15),
+            Expanded(child: Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: text))),
+            Icon(Icons.chevron_right_rounded, color: text.withOpacity(0.3)),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildLogoutAction() {
+  Widget _buildLogoutButton() {
     return Container(
       width: double.infinity,
+      height: 60,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(25),
-        color: Colors.redAccent.withOpacity(0.08),
-        border: Border.all(color: Colors.redAccent.withOpacity(0.1))
+        color: Colors.redAccent.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.1)),
       ),
-      child: TextButton.icon(
-        onPressed: () async {
+      child: InkWell(
+        onTap: () async {
           await FirebaseAuth.instance.signOut();
           Navigator.pushNamedAndRemoveUntil(context, '/connexion', (route) => false);
         },
-        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
-        icon: const Icon(Icons.power_settings_new_rounded, color: Colors.redAccent, size: 22),
-        label: const Text("Déconnexion du compte", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w800, fontSize: 16)),
-      ),
-    );
-  }
-
-  // --- NAVIGATION (Fidèle à l'Accueil) ---
-  Widget _buildBottomNav() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(25, 0, 25, 30),
-      height: 75,
-      decoration: BoxDecoration(
-        color: _noraPrimary,
-        borderRadius: BorderRadius.circular(35),
-        boxShadow: [BoxShadow(color: _noraPrimary.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(35),
-        child: BottomNavigationBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          currentIndex: _selectedIndex,
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.white.withOpacity(0.4),
-          type: BottomNavigationBarType.fixed,
-          showSelectedLabels: false,
-          showUnselectedLabels: false,
-          items: [
-            _buildNavItem(Icons.grid_view_rounded, 0),
-            _buildNavItem(Icons.bar_chart_rounded, 1),
-            _buildNavItem(Icons.add_circle_outline_rounded, 2, isPlus: true),
-            _buildNavItem(Icons.notifications_active_rounded, 3),
-            _buildNavItem(Icons.person_rounded, 4),
-          ],
-          onTap: (index) {
-            if (index == 2) {
-              _showMoreOptions(context);
-            } else if (index != _selectedIndex) {
-              if (index == 0) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const Accueil()));
-              if (index == 1) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const Statistique()));
-              if (index == 3) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const Alerte()));
-            }
-          },
+        borderRadius: BorderRadius.circular(20),
+        child: const Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.logout_rounded, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Text("Déconnexion", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  BottomNavigationBarItem _buildNavItem(IconData icon, int index, {bool isPlus = false}) {
-    bool isSelected = _selectedIndex == index;
-    return BottomNavigationBarItem(
-      icon: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: isPlus ? 32 : (isSelected ? 28 : 24), color: isPlus ? _noraSky : (isSelected ? Colors.white : Colors.white.withOpacity(0.4))),
-          if (isSelected && !isPlus) ...[
-            const SizedBox(height: 4),
-            Container(height: 4, width: 12, decoration: BoxDecoration(color: _noraSky, borderRadius: BorderRadius.circular(10))),
-          ]
-        ],
-      ),
-      label: "",
-    );
-  }
-
-  void _showMoreOptions(BuildContext context) {
+  void _showAvatarSelectionModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         padding: const EdgeInsets.all(25),
-        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(35))),
+        decoration: const BoxDecoration(
+          color: Colors.white, 
+          borderRadius: BorderRadius.vertical(top: Radius.circular(35))
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(width: 45, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+            const SizedBox(height: 20),
+            const Text("Choisir un avatar", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _noraPrimary)),
             const SizedBox(height: 25),
-            const Text("Actions Rapides", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _noraPrimary)),
-            const SizedBox(height: 15),
-            ListTile(leading: const Icon(Icons.add_location_alt_rounded, color: _noraPrimary), title: const Text("Ajouter un nouvel espace", style: TextStyle(fontWeight: FontWeight.w600)), onTap: () => Navigator.pop(context)),
-            ListTile(leading: const Icon(Icons.share_rounded, color: _noraPrimary), title: const Text("Partager mes analyses", style: TextStyle(fontWeight: FontWeight.w600)), onTap: () => Navigator.pop(context)),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, crossAxisSpacing: 15, mainAxisSpacing: 15),
+              itemCount: _availableAvatars.length,
+              itemBuilder: (context, index) {
+                String key = _availableAvatars.keys.elementAt(index);
+                IconData icon = _availableAvatars.values.elementAt(index);
+                return GestureDetector(
+                  onTap: () async {
+                    Navigator.pop(context);
+                    if (currentUser != null) {
+                      await FirebaseFirestore.instance.collection('users').doc(currentUser!.uid).update({'avatarKey': key});
+                      setState(() {});
+                    }
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(color: _noraPrimary.withOpacity(0.05), borderRadius: BorderRadius.circular(15)),
+                    child: Icon(icon, color: _noraPrimary, size: 30),
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAppBar(Color textColor) {
+    return SliverAppBar(
+      backgroundColor: Colors.transparent, elevation: 0, centerTitle: true, automaticallyImplyLeading: false,
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset('lib/images/Fichier 2.png', height: 30),
+          const SizedBox(width: 10),
+          Text("Mon Espace", style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 22)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title, Color textColor) {
+    return Padding(padding: const EdgeInsets.only(left: 10), child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: textColor)));
+  }
+
+  // --- NAVIGATION (VERSION CLASSIQUE DEMANDÉE) ---
+  Widget _buildBottomNav() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(25, 0, 25, 30),
+      height: 75,
+      decoration: BoxDecoration(color: _noraPrimary, borderRadius: BorderRadius.circular(35)),
+      child: BottomNavigationBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white.withOpacity(0.4),
+        type: BottomNavigationBarType.fixed,
+        showSelectedLabels: false,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.notifications_active_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: ""),
+        ],
+        onTap: (index) {
+          if (index != _selectedIndex) {
+            if (index == 0) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const Accueil()));
+            if (index == 1) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const Statistique()));
+            if (index == 3) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const Alerte()));
+            // Index 4 est la page actuelle
+          }
+        },
       ),
     );
   }

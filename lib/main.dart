@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // Import indispensable
-import 'firebase_options.dart'; // Import de vos clés API
+import 'package:firebase_core/firebase_core.dart';
+import 'services/notification_service.dart';
+import 'firebase_options.dart';
 import 'package:nora/pages/Accueil.dart';
 import 'package:nora/pages/Connexion.dart';
 import 'package:nora/pages/Inscription.dart';

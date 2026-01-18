@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_staggered_animations/flutter_staggered_animations.dart'; // Pour les animations
+import 'package:flutter/services.dart'; // IMPORT NÉCESSAIRE POUR LES VIBRATIONS
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart'; 
 import 'package:intl/intl.dart';
 import '../services/monitoring_service.dart';
 
@@ -20,7 +21,7 @@ class _AlerteState extends State<Alerte> {
   static const Color _noraSky = Color(0xFF5B9EEA);
   static const Color _noraSoftBlue = Color(0xFFE3F2FD);
 
-  int _selectedIndex = 3;
+  int _selectedIndex = 3; // Index pour la page Alerte
   int _selectedFilterIndex = 0;
   final List<String> _filters = ["Aujourd'hui", "7 derniers jours"];
 
@@ -29,8 +30,11 @@ class _AlerteState extends State<Alerte> {
     super.initState();
     MonitoringService.cleanOldAlerts();
     
-    // EXEMPLES : Simulation de données si la liste est vide pour ton test
+    // SIMULATION : Ajout d'alertes + VIBRATION
     if (MonitoringService.activeAlerts.isEmpty) {
+      // 1. On fait vibrer le téléphone pour signaler l'urgence
+      HapticFeedback.heavyImpact(); 
+
       MonitoringService.activeAlerts.addAll([
         HealthAlert(
           title: "Risque de Grippe Élevé",
@@ -76,7 +80,7 @@ class _AlerteState extends State<Alerte> {
           ),
         ),
         child: SafeArea(
-          child: AnimationLimiter( // Conteneur d'animation
+          child: AnimationLimiter(
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
@@ -99,9 +103,9 @@ class _AlerteState extends State<Alerte> {
                               return AnimationConfiguration.staggeredList(
                                 position: index,
                                 duration: const Duration(milliseconds: 500),
-                                child: SlideAnimation( // Animation de glissement
+                                child: SlideAnimation(
                                   verticalOffset: 50.0,
-                                  child: FadeInAnimation( // Animation d'apparition
+                                  child: FadeInAnimation(
                                     child: _buildInteractiveDismissible(alert),
                                   ),
                                 ),
@@ -121,6 +125,8 @@ class _AlerteState extends State<Alerte> {
     );
   }
 
+  // --- WIDGETS LOGIQUE MÉTIER ---
+
   Widget _buildInteractiveDismissible(HealthAlert alert) {
     return Dismissible(
       key: Key(alert.time.toString() + alert.title),
@@ -128,6 +134,7 @@ class _AlerteState extends State<Alerte> {
       background: _buildDeleteBackground(),
       onDismissed: (direction) {
         setState(() => MonitoringService.activeAlerts.remove(alert));
+        HapticFeedback.mediumImpact(); // Vibration légère à la suppression
       },
       child: _buildAlertCard(alert),
     );
@@ -148,7 +155,7 @@ class _AlerteState extends State<Alerte> {
         ],
         border: Border.all(color: alert.color.withOpacity(0.2)),
       ),
-      child: Material( // Pour l'effet de pression (InkWell)
+      child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(25),
@@ -157,7 +164,7 @@ class _AlerteState extends State<Alerte> {
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                Hero( // Animation Hero pour l'icône
+                Hero(
                   tag: alert.time.toString(),
                   child: Icon(alert.icon, color: alert.color, size: 30),
                 ),
@@ -206,8 +213,8 @@ class _AlerteState extends State<Alerte> {
     );
   }
 
-  // ... (Garde tes widgets _buildDeleteBackground, _buildFilterSelector, _buildAppBar, etc.)
-  
+  // --- WIDGETS UI ---
+
   Widget _buildDeleteBackground() {
     return Container(
       alignment: Alignment.centerRight,
@@ -231,7 +238,10 @@ class _AlerteState extends State<Alerte> {
           bool isSelected = _selectedFilterIndex == index;
           return Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _selectedFilterIndex = index),
+              onTap: () {
+                setState(() => _selectedFilterIndex = index);
+                HapticFeedback.lightImpact(); // Petite vibration au changement de filtre
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 decoration: BoxDecoration(
@@ -262,7 +272,10 @@ class _AlerteState extends State<Alerte> {
             Text("$count Notifications", style: const TextStyle(color: _noraBlue, fontWeight: FontWeight.w800, fontSize: 18)),
             if (count > 0)
               TextButton(
-                onPressed: () => setState(() => MonitoringService.activeAlerts.clear()),
+                onPressed: () {
+                   setState(() => MonitoringService.activeAlerts.clear());
+                   HapticFeedback.mediumImpact();
+                },
                 child: const Text("Tout effacer", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12)),
               ),
           ],
@@ -280,30 +293,45 @@ class _AlerteState extends State<Alerte> {
     );
   }
 
+  // --- MODIFICATION ICI : AJOUT DU LOGO ---
   Widget _buildAppBar() {
-    return const SliverAppBar(
-      backgroundColor: Colors.transparent, elevation: 0, centerTitle: true,
-      title: Text("Notifications", style: TextStyle(color: _noraBlue, fontWeight: FontWeight.w900, fontSize: 22)),
+    return SliverAppBar(
+      backgroundColor: Colors.transparent, 
+      elevation: 0, 
+      centerTitle: true,
+      automaticallyImplyLeading: false, // Empêche le bouton retour par défaut
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset('lib/images/Fichier 2.png', height: 30),
+          const SizedBox(width: 10),
+          const Text("Notifications", style: TextStyle(color: _noraBlue, fontWeight: FontWeight.w900, fontSize: 22)),
+        ],
+      ),
     );
   }
 
+  // --- NAVIGATION (VERSION CLASSIQUE) ---
   Widget _buildBottomNav() {
     return Container(
       margin: const EdgeInsets.fromLTRB(25, 0, 25, 30),
       height: 75,
-      decoration: BoxDecoration(color: _noraBlue, borderRadius: BorderRadius.circular(35)),
+      decoration: BoxDecoration(
+        color: _noraBlue,
+        borderRadius: BorderRadius.circular(35)
+      ),
       child: BottomNavigationBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         currentIndex: _selectedIndex,
         selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white38,
+        unselectedItemColor: Colors.white.withOpacity(0.4),
         type: BottomNavigationBarType.fixed,
         showSelectedLabels: false,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: ""),
-          BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: ""),
-          BottomNavigationBarItem(icon: Icon(Icons.add_box_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline_rounded), label: ""),
           BottomNavigationBarItem(icon: Icon(Icons.notifications_active_rounded), label: ""),
           BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: ""),
         ],
