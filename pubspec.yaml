@@ -48,5 +48,5 @@ flutter_launcher_icons:
   ios: true
   remove_alpha_ios: true
   # Assurez-vous que c'est bien l'image carrée (la spirale).
-  image_path: "lib/images/Fichier 2.png" 
+  image_path: "lib/images/Fichier 2.png"
   min_sdk_android: 21
